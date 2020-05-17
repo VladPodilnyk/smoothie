@@ -1,0 +1,18 @@
+version: "3.5"
+
+services:
+
+  redis-services:
+    container_name: redis-services
+    image: redis:latest
+    expose:
+      - 6379
+    ports:
+      - 6379:6379
+#    networks:
+#      - persistence-services
+#
+#networks:
+#  persistence-services:
+#    name: persistence-services
+#    driver: bridge
