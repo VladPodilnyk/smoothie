@@ -1,8 +1,5 @@
 # smoothie
-Trying to develop pure functional rate limiter.
 
-Design goals:
-
-- monomorphic (using concrete effect type implementation e.g. ZIO)
-- easy to use
-- minimal implicit usage
+A rate limiter that smoothe your day.
+The repository contains an old draft implementation that is written in Scala.
+Since maintaining Scala is a huge burden, the project will be rewriten in Go.
