@@ -2,6 +2,8 @@ package ratelimiter
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -22,15 +24,28 @@ func verifyRedisConnection(t *testing.T) {
 	}
 }
 
+// Super simple random key generator (fancy stuff is redundant here)
+func randKey(size int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	seed := rand.NewSource(time.Now().UnixNano())
+	random := rand.New(seed)
+	key := make([]byte, size)
+	for i := range key {
+		key[i] = charset[random.Intn(len(charset))]
+	}
+	return string(key)
+}
+
 func TestAllowRequestWithinSpecifiedRate(t *testing.T) {
 	verifyRedisConnection(t)
 
+	testKey := randKey(10)
 	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 5 * time.Second})
-	firstTry := limiter.Allow(context.Background(), "test-key")
+	firstTry := limiter.Allow(context.Background(), testKey)
 
 	time.Sleep(5 * time.Second)
 
-	secondTry := limiter.Allow(context.Background(), "test-key")
+	secondTry := limiter.Allow(context.Background(), testKey)
 	if !firstTry || !secondTry {
 		t.Errorf("Expected both requests to be allowed, bug got rate limited.")
 	}
@@ -39,9 +54,10 @@ func TestAllowRequestWithinSpecifiedRate(t *testing.T) {
 func TestDoNotAllowRequestThatExceedsLimit(t *testing.T) {
 	verifyRedisConnection(t)
 
+	testKey := randKey(10)
 	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 10 * time.Second})
-	limiter.Allow(context.Background(), "test-key")
-	isAllowed := limiter.Allow(context.Background(), "test-key")
+	limiter.Allow(context.Background(), testKey)
+	isAllowed := limiter.Allow(context.Background(), testKey)
 
 	if isAllowed {
 		t.Errorf("Expected request to be rate limited, but it was allowed.")
@@ -54,14 +70,15 @@ func TestExecFunctionWithingSpecifiedRate(t *testing.T) {
 
 	counter := 0
 	incrementCounter := func() error {
+		fmt.Println("Incrementing counter")
 		counter += 1
 		return nil
 	}
 
-	limiter.Exec(context.Background(), "test-key", incrementCounter)
+	testKey := randKey(10)
+	limiter.Exec(context.Background(), testKey, incrementCounter)
 	time.Sleep(5 * time.Second)
-	err := limiter.Exec(context.Background(), "test-key", incrementCounter)
-
+	err := limiter.Exec(context.Background(), testKey, incrementCounter)
 	if err != nil {
 		t.Errorf("Expected request to be allowed, but got rate limited.")
 	}
@@ -81,10 +98,11 @@ func TestRejectFunctionExecutionIfRateIsExceeded(t *testing.T) {
 		return nil
 	}
 
-	limiter.Exec(context.Background(), "test-key", incrementCounter)
-	err := limiter.Exec(context.Background(), "test-key", incrementCounter)
+	testKey := randKey(10)
+	limiter.Exec(context.Background(), testKey, incrementCounter)
+	err := limiter.Exec(context.Background(), testKey, incrementCounter)
 
 	if err == nil {
-		t.Errorf("Expected request to be allowed, but got rate limited.")
+		t.Errorf("Expected request to be rate limited, but got allowed")
 	}
 }
