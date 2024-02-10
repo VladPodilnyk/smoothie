@@ -22,12 +22,23 @@ func verifyRedisConnection(t *testing.T) {
 	}
 }
 
+func fatalError(t *testing.T, err error) {
+	if err != nil {
+		t.Fatalf("Fatal error: %s", err.Error())
+	}
+}
+
 func TestAllowRequestWithinSpecifiedRate(t *testing.T) {
 	verifyRedisConnection(t)
-	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 5})
-	firstTry := limiter.Allow(context.Background(), "test-key")
+
+	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 5 * time.Second})
+	firstTry, err := limiter.Allow(context.Background(), "test-key")
+	fatalError(t, err)
+
 	time.Sleep(5 * time.Second)
-	secondTry := limiter.Allow(context.Background(), "test-key")
+
+	secondTry, err := limiter.Allow(context.Background(), "test-key")
+	fatalError(t, err)
 	if !firstTry || !secondTry {
 		t.Errorf("Expected both requests to be allowed, bug got rate limited.")
 	}
@@ -35,9 +46,12 @@ func TestAllowRequestWithinSpecifiedRate(t *testing.T) {
 
 func TestDoNotAllowRequestThatExceedsLimit(t *testing.T) {
 	verifyRedisConnection(t)
-	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 10})
+
+	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 10 * time.Second})
 	limiter.Allow(context.Background(), "test-key")
-	isAllowed := limiter.Allow(context.Background(), "test-key")
+	isAllowed, err := limiter.Allow(context.Background(), "test-key")
+	fatalError(t, err)
+
 	if isAllowed {
 		t.Errorf("Expected request to be rate limited, but it was allowed.")
 	}
@@ -45,7 +59,7 @@ func TestDoNotAllowRequestThatExceedsLimit(t *testing.T) {
 
 func TestExecFunctionWithingSpecifiedRate(t *testing.T) {
 	verifyRedisConnection(t)
-	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 5})
+	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 5 * time.Second})
 
 	counter := 0
 	incrementCounter := func() error {
@@ -68,8 +82,7 @@ func TestExecFunctionWithingSpecifiedRate(t *testing.T) {
 
 func TestRejectFunctionExecutionIfRateIsExceeded(t *testing.T) {
 	verifyRedisConnection(t)
-	verifyRedisConnection(t)
-	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 5})
+	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 5 * time.Second})
 
 	counter := 0
 	incrementCounter := func() error {
