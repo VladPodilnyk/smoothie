@@ -36,13 +36,7 @@ func New(config *redis.Options, rate Rate) *RateLimiter {
 }
 
 func (limiter *RateLimiter) Exec(ctx context.Context, key string, effect func() error) error {
-	isAllowed, err := limiter.Allow(ctx, key)
-
-	if err != nil {
-		return err
-	}
-
-	if isAllowed {
+	if limiter.Allow(ctx, key) {
 		maybeError := effect()
 		return maybeError
 	}
@@ -50,35 +44,25 @@ func (limiter *RateLimiter) Exec(ctx context.Context, key string, effect func() 
 	return errors.New(("Limit exceeded, please try again later."))
 }
 
-func (limiter *RateLimiter) Allow(ctx context.Context, key string) (bool, error) {
+func (limiter *RateLimiter) Allow(ctx context.Context, key string) bool {
 	counter, err := limiter.get(ctx, key)
 	if err != nil {
-		return false, err
+		return false
 	}
 
-	err = limiter.inc(ctx, key)
-	if err != nil {
-		return false, err
-	}
-
+	limiter.inc(ctx, key)
 	if counter > limiter.rate.NumberOfRequests+1 {
-		return false, nil
+		return false
 	}
-	return true, nil
+	return true
 }
 
-func (limiter *RateLimiter) inc(ctx context.Context, key string) error {
+func (limiter *RateLimiter) inc(ctx context.Context, key string) {
 	ttl := time.Now().Add(limiter.rate.Duration).Unix()
-	value, err := redisScript.Run(ctx, limiter.client, []string{key}, ttl).Int()
+	_, err := redisScript.Run(ctx, limiter.client, []string{key}, ttl).Int()
 	if err != nil {
-		return err
+		panic(err)
 	}
-
-	if value == 0 {
-		return errors.New("Failed to increment key value.")
-	}
-
-	return nil
 }
 
 func (limiter *RateLimiter) get(ctx context.Context, key string) (uint, error) {

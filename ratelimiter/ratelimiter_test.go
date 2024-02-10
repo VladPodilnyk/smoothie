@@ -22,23 +22,15 @@ func verifyRedisConnection(t *testing.T) {
 	}
 }
 
-func fatalError(t *testing.T, err error) {
-	if err != nil {
-		t.Fatalf("Fatal error: %s", err.Error())
-	}
-}
-
 func TestAllowRequestWithinSpecifiedRate(t *testing.T) {
 	verifyRedisConnection(t)
 
 	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 5 * time.Second})
-	firstTry, err := limiter.Allow(context.Background(), "test-key")
-	fatalError(t, err)
+	firstTry := limiter.Allow(context.Background(), "test-key")
 
 	time.Sleep(5 * time.Second)
 
-	secondTry, err := limiter.Allow(context.Background(), "test-key")
-	fatalError(t, err)
+	secondTry := limiter.Allow(context.Background(), "test-key")
 	if !firstTry || !secondTry {
 		t.Errorf("Expected both requests to be allowed, bug got rate limited.")
 	}
@@ -49,8 +41,7 @@ func TestDoNotAllowRequestThatExceedsLimit(t *testing.T) {
 
 	limiter := New(&testRedisOptions, Rate{NumberOfRequests: 1, Duration: 10 * time.Second})
 	limiter.Allow(context.Background(), "test-key")
-	isAllowed, err := limiter.Allow(context.Background(), "test-key")
-	fatalError(t, err)
+	isAllowed := limiter.Allow(context.Background(), "test-key")
 
 	if isAllowed {
 		t.Errorf("Expected request to be rate limited, but it was allowed.")
